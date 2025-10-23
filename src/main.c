@@ -121,7 +121,7 @@ void main(void)
     k_thread_join(&thread_a_data, K_FOREVER);
     k_thread_join(&thread_b_data, K_FOREVER);
 
-    /* Indicate end by turning BLUE LED on steady */
+    /* Indicate end by turning BLUE LED on steady2 */
     shared_pattern = 0x00;
     gpio_pin_set_dt(&led_red, 0);
     gpio_pin_set_dt(&led_green, 0);
