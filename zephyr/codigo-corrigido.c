@@ -16,8 +16,11 @@ static const struct gpio_dt_spec led_blue = GPIO_DT_SPEC_GET(LED_BLUE_NODE, gpio
 // Função que alterna aleatoriamente um LED
 void toggle_led_aleatorio(void)
 {
+    k_mutex_lock(&rand_mutex, K_FOREVER);
 
     int escolha = rand() % 2;
+    
+    k_mutex_unlock(&rand_mutex);
 
     if (escolha == 0) {
         gpio_pin_toggle_dt(&led_red);

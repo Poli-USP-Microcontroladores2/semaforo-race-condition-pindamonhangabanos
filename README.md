@@ -58,3 +58,16 @@ No repositório do grupo, incluir:
 ---
 
 **Repositório:** entregue via GitHub Classroom (um repositório por grupo) e um PDF do markdown final no Moodle.
+
+# Planejamento de Testes
+| Caso de Teste | Pré-condição | Etapas de Teste | Pós-condição Esperada |
+|----------------|---------------|------------------|------------------------|
+| 1 | ... | ... | ... |
+| 2 | ... | ... | ... |
+| 3 | ... | ... | ... |
+
+# O que estava errado antes?
+
+# O que mudou com a correção?
+
+# O comportamento agora está estável?
