@@ -41,17 +41,24 @@ void thread_a_entry(void)
 
     for (int i = 0; i < NUM_INCREMENTOS; i++) {
         // Início da Seção Crítica (Não Protegida!)
-        // O compilador pode otimizar isso, e o RTOS pode preempcionar no meio:
-        // 1. Lê contador_compartilhado para um registrador (R1 = contador_compartilhado)
-        // 2. Incrementa o registrador (R1 = R1 + 1) -> **Pode ocorrer preempção aqui!**
-        // 3. Escreve o registrador de volta (contador_compartilhado = R1)
-        contador_compartilhado = contador_compartilhado + 1;
+        
+// 2. FORÇA A TROCA DE CONTEXTO!
+        // Aqui, a Thread B (mesma prioridade) vai rodar,
+        // ler o mesmo valor de 'contador_compartilhado',
+        // incrementá-lo e escrevê-lo de volta.
+        k_yield(); 
+        // k_sleep(K_MSEC(1)); // k_sleep também funciona muito bem aqui
+
+        // 3. Incrementa a cópia local (que agora está obsoleta)
+        local_copia = local_copia + 1;
+        
+        // 4. Escreve o valor obsoleto de volta, sobrescrevendo
+        //    o incremento que a Thread B acabou de fazer.
+        contador_compartilhado = local_copia;
+        
         // Fim da Seção Crítica
     }
-
-    LOG_INF("Thread A terminou. Contador final por A: %d", contador_compartilhado);
 }
-
 /**
  * @brief Função de entrada da Thread B.
  *
@@ -63,12 +70,26 @@ void thread_b_entry(void)
 
     for (int i = 0; i < NUM_INCREMENTOS; i++) {
         // Início da Seção Crítica (Não Protegida!)
-        // A mesma sequência vulnerável de Leitura-Modificação-Escrita.
-        contador_compartilhado = contador_compartilhado + 1;
+        
+        // 1. Lê contador_compartilhado
+        int local_copia = contador_compartilhado;
+
+        // 2. FORÇA A TROCA DE CONTEXTO!
+        // Cede a vez para a Thread A
+        k_yield();
+        // k_sleep(K_MSEC(1));
+
+        // 3. Incrementa a cópia local (obsoleta)
+ // 3. Incrementa a cópia local (obsoleta)
+        local_copia = local_copia + 1;
+        
+        // 4. Escreve o valor obsoleto de volta
+        contador_compartilhado = local_copia;
+        
         // Fim da Seção Crítica
     }
 
-    LOG_INF("Thread B terminou. Contador final por B: %d", contador_compartilhado);
+    LOG_INF("Thread B terminou.");
 }
 
 
@@ -83,7 +104,7 @@ int main(void)
 
     LOG_INF("Demonstração de Condição de Corrida (Race Condition) no Zephyr.");
     LOG_INF("Valor de incremento por thread: %d", NUM_INCREMENTOS);
-    LOG_INF("Valor final **ESPERADO**: %d", valor_esperado);
+    LOG_INF("Valor final *ESPERADO*: %d", valor_esperado);
     LOG_INF("-------------------------------------------------------");
 
     // Cria e inicia a Thread A
@@ -110,9 +131,9 @@ int main(void)
     } else {
         LOG_ERR("ERRO! O contador final (%d) é diferente do esperado (%d).", 
                 contador_compartilhado, valor_esperado);
-        LOG_ERR("Isto é a **Condição de Corrida** em ação.");
+        LOG_ERR("Isto é a *Condição de Corrida* em ação.");
     }
     LOG_INF("Demonstração concluída.");
 
-    return 0;
+    return 0;
 }
