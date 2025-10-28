@@ -3,10 +3,11 @@ O código do integrante Bruno Mora foi testado e percebi que o motivo de acontec
 <img width="1027" height="269" alt="erro" src="https://github.com/user-attachments/assets/5e5837ba-67a4-403c-9c35-a2705770ab47" />
 2. Planejamento de testes:
 
-<img width="1138" height="245" alt="acerto" src="https://github.com/user-attachments/assets/ff6ae079-797e-428e-92b2-2a88914f5d55" />
+
 3. Correção e reteste:
 Após a correção, que utilizou mutex para trancar a thread enquanto ela funcionava e destrancar após o término da contagem, o código funcionou perfeitamente sem nenhuma race condition. Isso se deve a capacidade dos mutex de bloquear o escalonador e não permitir que seções críticas sejam interrompidas, tornando o código estável.
-4. Avaliação Interna:
+<img width="1138" height="245" alt="acerto" src="https://github.com/user-attachments/assets/ff6ae079-797e-428e-92b2-2a88914f5d55" />
+5. Avaliação Interna:
 
 5.1 Código original:
 #include <zephyr/kernel.h>
