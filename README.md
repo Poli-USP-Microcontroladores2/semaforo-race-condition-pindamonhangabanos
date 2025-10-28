@@ -9,7 +9,7 @@ Após a correção, que utilizou mutex para trancar a thread enquanto ela funcio
 planejamento pós mudanças:
 <img width="1416" height="119" alt="arrumado" src="https://github.com/user-attachments/assets/8e4dedd6-b36d-4523-98b4-e4c6a8b3b5b2" />
 4. Avaliação Interna:
-A race condition observada no código original se devia ao compartilhamento da variável global, sem proteção, por duas threads. Esse erro pode ser facilmente evitado utilizando semáforos e o semáforo que utilizei foi um binário do tipo mutex. Ele foi responsável por proteger partes críticas do funcionamento do código e permitir que a race condition jamais aconteça. 
+A race condition observada no código original se devia ao compartilhamento da variável global, sem proteção, por duas threads. Esse erro pode ser facilmente evitado utilizando semáforos e o semáforo que utilizei foi um binário do tipo mutex. Ele foi responsável por proteger partes críticas do funcionamento do código e permitir que a race condition jamais aconteça, tornando o código estável e funcional.
 5.1 Código original(Guilherme):
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
