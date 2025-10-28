@@ -58,3 +58,6 @@ No repositório do grupo, incluir:
 ---
 
 **Repositório:** entregue via GitHub Classroom (um repositório por grupo) e um PDF do markdown final no Moodle.
+
+![3x4 Bruno Souza Mora](https://github.com/user-attachments/assets/c2acf5f0-f729-4de2-a115-c15c7c96203d)
+
