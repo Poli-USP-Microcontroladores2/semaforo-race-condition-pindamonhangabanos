@@ -9,7 +9,7 @@ Após a correção, que utilizou mutex para trancar a thread enquanto ela funcio
 <img width="1138" height="245" alt="acerto" src="https://github.com/user-attachments/assets/ff6ae079-797e-428e-92b2-2a88914f5d55" />
 5. Avaliação Interna:
 
-5.1 Código original:
+5.1 Código original(Guilherme):
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
