@@ -11,6 +11,7 @@ planejamento pós mudanças:
 4. Avaliação Interna:
 A race condition observada no código original se devia ao compartilhamento da variável global, sem proteção, por duas threads. Esse erro pode ser facilmente evitado utilizando semáforos e o semáforo que utilizei foi um binário do tipo mutex. Ele foi responsável por proteger partes críticas do funcionamento do código e permitir que a race condition jamais aconteça, tornando o código estável e funcional.
 5.1 Código original(Guilherme):
+
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
@@ -24,54 +25,44 @@ static const struct gpio_dt_spec led_red = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpio
 static const struct gpio_dt_spec led_green = GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios);
 static const struct gpio_dt_spec led_blue = GPIO_DT_SPEC_GET(DT_ALIAS(led2), gpios);
 
-/* Shared global variable */
+/* Shared global variable intentionally unprotected to create a race condition */
 static volatile uint8_t shared_pattern = 0;
 
-/* * 1. DEFINIÇÃO DO MUTEX
- * Define e inicializa estaticamente o mutex que protegerá o shared_pattern.
+/* Helper that applies LED outputs reading the shared variable repeatedly.
+ * Intentionally reads the shared variable separately for each LED with small delays
+ * between writes — this increases the chance of interleaving and visible color mixing.
  */
-K_MUTEX_DEFINE(pattern_mutex);
-
-
-/* Helper que aplica LED outputs.
- * Esta função NÃO é mais o problema, pois só será chamada
- * de dentro de uma seção crítica protegida pelo mutex.
- * (Voltamos a usar k_busy_wait, pois k_msleep dentro de um 
- * mutex travado é uma má prática).
- */
-static void apply_leds_pattern(void)
+static void apply_leds_with_race(void)
 {
     uint8_t val;
 
-    /* A thread que está aqui é dona do 'pattern_mutex',
-     * então 'shared_pattern' não pode mudar. */
-
     val = (shared_pattern & 0x01) ? 1U : 0U; /* red */
     gpio_pin_set_dt(&led_red, val);
-    k_busy_wait(3000);
+    k_msleep(30);
 
     val = (shared_pattern & 0x02) ? 1U : 0U; /* green */
     gpio_pin_set_dt(&led_green, val);
-    k_busy_wait(3000);
-
+   k_msleep(30);
     val = (shared_pattern & 0x04) ? 1U : 0U; /* blue */
     gpio_pin_set_dt(&led_blue, val);
-    k_busy_wait(3000);
+   k_msleep(30);
 }
 
-/* Thread A: toggles RED on/off repeatedly */
+/* Thread A: toggles RED on/off repeatedly by writing shared_pattern = 0x01 or 0x00 */
 void thread_a(void *p1, void *p2, void *p3)
 {
     ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
 
     for (int i = 0; i < 40; i++) {
         shared_pattern = 0x01; /* request RED */
-        apply_leds_pattern();
+        k_busy_wait(2000);
+        apply_leds_with_race();
 
         k_msleep(80);
-        
+
         shared_pattern = 0x00; /* all off */
-        apply_leds_pattern();
+        k_busy_wait(2000);
+        apply_leds_with_race();
 
         k_msleep(120);
     }
@@ -79,18 +70,22 @@ void thread_a(void *p1, void *p2, void *p3)
     printk("Thread A finished\n");
 }
 
-/* Thread B: cycles between GREEN and BLUE */
+/* Thread B: cycles between GREEN and BLUE by writing shared_pattern = 0x02 or 0x04 */
 void thread_b(void *p1, void *p2, void *p3)
 {
     ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
 
     for (int i = 0; i < 40; i++) {
         shared_pattern = 0x02; /* request GREEN */
-        apply_leds_pattern();
+        k_busy_wait(1500);
+        apply_leds_with_race();
+
         k_msleep(100);
-    
+
         shared_pattern = 0x04; /* request BLUE */
-        apply_leds_pattern();
+        k_busy_wait(1500);
+        apply_leds_with_race();
+
         k_msleep(140);
     }
 
@@ -107,9 +102,9 @@ void main(void)
 {
     int ret;
 
-    printk("Starting MUTEX-safe LED demo\n");
+    printk("Starting race-condition LED demo\n");
 
-    /* Configure LEDs from device-tree (igual a antes) */
+    /* Configure LEDs from device-tree */
     ret = gpio_pin_configure_dt(&led_red, GPIO_OUTPUT_LOW);
     if (ret) {
         printk("Failed to configure red LED\n");
@@ -126,25 +121,20 @@ void main(void)
         return;
     }
 
-    /* * 4. INICIALIZAÇÃO
-     * Não é necessária uma chamada k_mutex_init() aqui, 
-     * pois K_MUTEX_DEFINE já faz a inicialização.
-     */
-
-    /* Create both threads (igual a antes) */
+    /* Create both threads (they start immediately) */
     k_thread_create(&thread_a_data, stack_a, STACK_SIZE,
-                      thread_a, NULL, NULL, NULL,
-                      THREAD_PRIORITY, 0, K_NO_WAIT);
+                    thread_a, NULL, NULL, NULL,
+                    THREAD_PRIORITY, 0, K_NO_WAIT);
 
     k_thread_create(&thread_b_data, stack_b, STACK_SIZE,
-                      thread_b, NULL, NULL, NULL,
-                      THREAD_PRIORITY, 0, K_NO_WAIT);
+                    thread_b, NULL, NULL, NULL,
+                    THREAD_PRIORITY, 0, K_NO_WAIT);
 
     /* Wait for both threads to finish */
     k_thread_join(&thread_a_data, K_FOREVER);
     k_thread_join(&thread_b_data, K_FOREVER);
 
-    /* Indicate end (igual a antes) */
+    /* Indicate end by turning BLUE LED on steady */
     shared_pattern = 0x00;
     gpio_pin_set_dt(&led_red, 0);
     gpio_pin_set_dt(&led_green, 0);
@@ -152,6 +142,7 @@ void main(void)
 
     printk("Demo finished — blue LED steady\n");
 }
+
 
 Código corrigido(Guilherme):
 
