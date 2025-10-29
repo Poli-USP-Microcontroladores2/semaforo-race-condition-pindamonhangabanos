@@ -61,7 +61,7 @@ A race condition observada no código original se devia ao compartilhamento da v
 
 PARTE DO TIAGO
 
-1. o código do guilherme apresenta uma race condition entre as threads A e B devido a amb as utilizarem a variável global shared_pattern e a função apply_leds_pattern, gerando interrupções no código e comportamentos inesperados, como duas leds ligarem ao mesmo tempo.
+1. o código do guilherme apresenta uma race condition entre as threads A e B devido a ambas utilizarem a variável global shared_pattern e a função apply_leds_pattern, gerando interrupções no código e comportamentos inesperados, como duas leds ligarem ao mesmo tempo.
 
 2. planejamento dos testes:
 
