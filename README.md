@@ -45,8 +45,8 @@ Cada integrante deverá:
 
 No repositório do grupo, incluir:
 1. `README.md` (este arquivo) contendo:
-   - Nome dos integrantes.
-   - Cenário escolhido.
+   - Bruno Mora, GUilherme Fernandes, Tiago Hayashi
+   - Uso compartilhado da função rand() e Uso compartilhado de uma variável global
    - Casos de teste.
    - Descrição da race condition e da solução.
    - Avaliação de cada colega.
@@ -62,12 +62,18 @@ No repositório do grupo, incluir:
 # Planejamento de Testes
 | Caso de Teste | Pré-condição | Etapas de Teste | Pós-condição Esperada |
 |----------------|---------------|------------------|------------------------|
-| 1 | ... | ... | ... |
-| 2 | ... | ... | ... |
-| 3 | ... | ... | ... |
+| 1 | O código está configurado com LOG e Serial | Verificar se a seed da thread é a mesma antes e depois da execução do código através dos LOGs | A seed deve ser diferente na mesma thread caso as funções sejam chamadas ao mesmo tempo |
+| 2 | O código agora possui um MUTEX associado a obtenção da seed | Verficar se a seed da tread é a mesma antes e depois da execução do código através dos LOGs | A seed deve ser a mesma que a anterior na thread|
 
 # O que estava errado antes?
-
+  O Microcontrolador compartilha a função rand() com as duas threads e, por conta disso, o valor da seed pode ser alterado no caso de uma interrupção durante
+  a chamada dessa função. Isso faz com que a integridade do gerador de funções não seja garantida e faça com que a execução do código não seja previsível.
 # O que mudou com a correção?
-
+  Foi aplicado um MUTEX quando a função rand() é chamada, assim, o mesmo não pode ser interrompido quando está em execução. Dessa forma, o valor utilizado pela função é preservado na thread e não afeta a integridade do gerador de funções.
 # O comportamento agora está estável?
+  Agora, a função não é interrompida no meio e o comportamento do LED no microcontrolador está estável, já que a variável salva não muda ao retornar para a thread após a interrupção.
+
+# Evidências
+
+Teste depois de colocar o MUTEX
+<img width="687" height="166" alt="image" src="https://github.com/user-attachments/assets/fd869d30-b8d5-4ca6-845e-41265f320e41" />
