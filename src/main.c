@@ -24,15 +24,14 @@ static void apply_leds_with_race(void)
 
     val = (shared_pattern & 0x01) ? 1U : 0U; /* red */
     gpio_pin_set_dt(&led_red, val);
-    k_busy_wait(3000);
+    k_msleep(30);
 
     val = (shared_pattern & 0x02) ? 1U : 0U; /* green */
     gpio_pin_set_dt(&led_green, val);
-    k_busy_wait(3000);
-
+   k_msleep(30);
     val = (shared_pattern & 0x04) ? 1U : 0U; /* blue */
     gpio_pin_set_dt(&led_blue, val);
-    k_busy_wait(3000);
+   k_msleep(30);
 }
 
 /* Thread A: toggles RED on/off repeatedly by writing shared_pattern = 0x01 or 0x00 */
