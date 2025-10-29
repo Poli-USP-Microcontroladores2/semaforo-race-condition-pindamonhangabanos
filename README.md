@@ -72,3 +72,163 @@ PARTE DO TIAGO
 
    3. Correção do código: para corrigir o código foi utilizado mutex em ambas as threads assim que elas modificam a variável global ou acessam a função.
   
+código original(tiago):
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/printk.h>
+
+/* Ajuste de acordo com os pinos do FRDM-KL25Z */
+#define RED_LED_NODE   DT_ALIAS(led0)
+#define GREEN_LED_NODE DT_ALIAS(led1)
+
+static const struct gpio_dt_spec red_led = GPIO_DT_SPEC_GET(RED_LED_NODE, gpios);
+static const struct gpio_dt_spec green_led = GPIO_DT_SPEC_GET(GREEN_LED_NODE, gpios);
+
+#define STACK_SIZE 512
+#define PRIORITY 5
+#define DELAY_MS 100
+
+/* Variável global compartilhada */
+volatile int shared_counter = 0;
+
+/* Mutex para proteger (habilite para corrigir race condition) */
+K_MUTEX_DEFINE(counter_mutex);
+
+/* Se quiser demonstrar o erro, comente as duas linhas de lock/unlock! */
+
+/* Thread A */
+void thread_a(void)
+{
+    while (1) {
+        /* 🔴 Race condition demonstrativa */
+        // k_mutex_lock(&counter_mutex, K_FOREVER);
+
+        int local = shared_counter;
+        local++;
+        k_msleep(10); // simula atraso
+        shared_counter = local;
+
+        // k_mutex_unlock(&counter_mutex);
+
+        gpio_pin_set_dt(&red_led, 1);
+        k_msleep(DELAY_MS);
+        gpio_pin_set_dt(&red_led, 0);
+
+        printk("Thread A: shared_counter = %d\n", shared_counter);
+    }
+}
+
+/* Thread B */
+void thread_b(void)
+{
+    while (1) {
+        // k_mutex_lock(&counter_mutex, K_FOREVER);
+
+        int local = shared_counter;
+        local++;
+        k_msleep(10);
+        shared_counter = local;
+
+        // k_mutex_unlock(&counter_mutex);
+
+        gpio_pin_set_dt(&green_led, 1);
+        k_msleep(DELAY_MS);
+        gpio_pin_set_dt(&green_led, 0);
+
+        printk("Thread B: shared_counter = %d\n", shared_counter);
+    }
+}
+
+/* Criação das threads */
+K_THREAD_DEFINE(thread_a_id, STACK_SIZE, thread_a, NULL, NULL, NULL, PRIORITY, 0, 0);
+K_THREAD_DEFINE(thread_b_id, STACK_SIZE, thread_b, NULL, NULL, NULL, PRIORITY, 0, 0);
+
+void main(void)
+{
+    printk("=== Exemplo de Race Condition no FRDM-KL25Z (Zephyr 3.4.x) ===\n");
+
+    if (!device_is_ready(red_led.port) || !device_is_ready(green_led.port)) {
+        printk("Erro: LEDs não estão prontos\n");
+        return;
+    }
+
+    gpio_pin_configure_dt(&red_led, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure_dt(&green_led, GPIO_OUTPUT_INACTIVE);
+
+    printk("Threads iniciadas...\n");
+}
+
+código corrigido(tiago):
+
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/logging/log.h>
+#include <stdlib.h>    // Para rand() e srand()
+#include <zephyr/sys/printk.h>
+
+LOG_MODULE_REGISTER(race_example, LOG_LEVEL_INF);
+
+// LEDs: KL25Z - led0 = vermelho, led2 = azul
+#define LED_RED_NODE   DT_ALIAS(led0)
+#define LED_BLUE_NODE  DT_ALIAS(led2)
+
+static const struct gpio_dt_spec led_red = GPIO_DT_SPEC_GET(LED_RED_NODE, gpios);
+static const struct gpio_dt_spec led_blue = GPIO_DT_SPEC_GET(LED_BLUE_NODE, gpios);
+
+// Função que alterna aleatoriamente um LED
+void toggle_led_aleatorio(void)
+{
+    k_mutex_lock(&rand_mutex, K_FOREVER);
+
+    int escolha = rand() % 2;
+    
+    k_mutex_unlock(&rand_mutex);
+
+    if (escolha == 0) {
+        gpio_pin_toggle_dt(&led_red);
+        LOG_INF("Toggle no LED VERMELHO (thread: %p)", k_current_get());
+    } else {
+        gpio_pin_toggle_dt(&led_blue);
+        LOG_INF("Toggle no LED AZUL (thread: %p)", k_current_get());
+    }
+}
+
+// Thread A
+void thread_a(void *p1, void *p2, void *p3)
+{
+    while (1) {
+        toggle_led_aleatorio();
+        k_msleep(150);
+    }
+}
+
+// Thread B
+void thread_b(void *p1, void *p2, void *p3)
+{
+    while (1) {
+        toggle_led_aleatorio();
+        k_msleep(120);
+    }
+}
+
+// Define as threads
+K_THREAD_DEFINE(thread_a_id, 512, thread_a, NULL, NULL, NULL, 5, 0, 0);
+K_THREAD_DEFINE(thread_b_id, 512, thread_b, NULL, NULL, NULL, 5, 0, 0);
+
+void main(void)
+{
+    // Inicializa gerador rand com base no uptime (sem seed, pode repetir no reboot)
+    srand((unsigned int)k_uptime_get());
+
+    if (!device_is_ready(led_red.port) || !device_is_ready(led_blue.port)) {
+        LOG_ERR("GPIOs dos LEDs não estão prontos");
+        return;
+    }
+
+    gpio_pin_configure_dt(&led_red, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure_dt(&led_blue, GPIO_OUTPUT_INACTIVE);
+
+    LOG_INF("Iniciando teste de Race Condition com LEDs");
+}
