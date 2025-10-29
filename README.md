@@ -17,10 +17,9 @@ Atividade: Resolução de Race Condition com Semáforo
 | 3 | Existem duas threads com a mesma prioridade que incrementam em uma variável global. A thread deve receber a variável global "shared_counter"| Thread recebe a variável -> Incrementa na variável -> Apenas vai salvar na variável o valor incrementado pela última thread executada | Se a thread retornar o valor anterior +1 em relação a outra thread, não acontece racing condition e obtém-se os dados corretos do incremento de cada thread |
 
 ## O que estava errado antes?
-  O Microcontrolador compartilha a função rand() com as duas threads e, por conta disso, o valor da seed pode ser alterado no caso de uma interrupção durante
-  a chamada dessa função. Isso faz com que a integridade do gerador de funções não seja garantida e faça com que a execução do código não seja previsível.
+  Duas threads compartilham uma variável global de contagem e cada thread incrementa nessa variável. O problema acontece na aquisição da variável por ambas as threads, que apenas obtém o valor original sem considerar o incremento da outra thread por estarem compartilhando recursos e terem o mesmo nível de prioridade.
 ## O que mudou com a correção?
-  Foi aplicado um MUTEX quando a função rand() é chamada, assim, o mesmo não pode ser interrompido quando está em execução. Dessa forma, o valor utilizado pela função é preservado na thread e não afeta a integridade do gerador de funções.
+  Foi aplicado um MUTEX quando a aquisição da variável global é feita, assim, o mesmo não pode ser interrompido quando está em execução. Dessa forma, o valor utilizado pelas threads é incrementado corretamente e salvo na variavel global para que a próxima thread consiga incrementar coretamente.
 ## O comportamento agora está estável?
   Agora, a função não é interrompida no meio e o comportamento do LED no microcontrolador está estável, já que a variável salva não muda ao retornar para a thread após a interrupção.
 
