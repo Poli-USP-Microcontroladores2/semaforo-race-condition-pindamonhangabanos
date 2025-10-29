@@ -320,5 +320,10 @@ void main(void)
     gpio_pin_set_dt(&led_green, 0);
     gpio_pin_set_dt(&led_blue, 1);
 
+
+PARTE DO TIAGO
+
+1. o código consertado pertence ao Bruno Mora
+
     printk("Demo finished — blue LED steady\n");
 }
