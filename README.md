@@ -46,7 +46,7 @@ Cada integrante deverá:
 No repositório do grupo, incluir:
 1. `README.md` (este arquivo) contendo:
    - Bruno Mora, GUilherme Fernandes, Tiago Hayashi
-   - Uso compartilhado da função rand() e Uso compartilhado de uma variável global
+   - Uso compartilhado de uma variável global
    - Casos de teste.
    - Descrição da race condition e da solução.
    - Avaliação de cada colega.
@@ -62,8 +62,9 @@ No repositório do grupo, incluir:
 # Planejamento de Testes
 | Caso de Teste | Pré-condição | Etapas de Teste | Pós-condição Esperada |
 |----------------|---------------|------------------|------------------------|
-| 1 | O código está configurado com LOG e Serial | Verificar se a seed da thread é a mesma antes e depois da execução do código através dos LOGs | A seed deve ser diferente na mesma thread caso as funções sejam chamadas ao mesmo tempo |
-| 2 | O código agora possui um MUTEX associado a obtenção da seed | Verficar se a seed da tread é a mesma antes e depois da execução do código através dos LOGs | A seed deve ser a mesma que a anterior na thread|
+| 1 | Existem duas threads com a mesma prioridade que incrementam em uma variável global. A thread deve receber a variável global "shared_counter"| Thread recebe a variável -> Incrementa na variável -> Apenas vai salvar na variável o valor incrementado pela última thread executada | A variável global imprimida deve ser igual em ambas as threads caso ocorra racing condition |
+| 2 | Existem duas threads com a mesma prioridade que incrementam em uma variável global. A thread deve receber a variável global "shared_counter"| Thread recebe a variável -> Incrementa na variável -> Apenas vai salvar na variável o valor incrementado pela última thread executada | Se a thread retornar o dobro do valor do print anterior, não está acontecendo racing condition, porém, os dados não estão sendo obtidos levando em consideração o incremento de cada thread |
+| 3 | Existem duas threads com a mesma prioridade que incrementam em uma variável global. A thread deve receber a variável global "shared_counter"| Thread recebe a variável -> Incrementa na variável -> Apenas vai salvar na variável o valor incrementado pela última thread executada | Se a thread retornar o valor anterior +1 em relação a outra thread, não acontece racing condition e obtém-se os dados corretos do incremento de cada thread |
 
 # O que estava errado antes?
   O Microcontrolador compartilha a função rand() com as duas threads e, por conta disso, o valor da seed pode ser alterado no caso de uma interrupção durante
@@ -75,5 +76,21 @@ No repositório do grupo, incluir:
 
 # Evidências
 
+Teste antes de colocar o MUTEX
+
+Casos de Teste: [1] -> Ocorreu como esperado, portanto, está acontecendo racing condition [2] e [3] -> Segundo as condições, está ocorrendo racing condition pois elas não são cumpridas.
+
+<img width="391" height="172" alt="image" src="https://github.com/user-attachments/assets/97dad3b0-82d8-4ed4-86be-82060657b692" />
+
 Teste depois de colocar o MUTEX
-<img width="687" height="166" alt="image" src="https://github.com/user-attachments/assets/fd869d30-b8d5-4ca6-845e-41265f320e41" />
+
+Casos de Teste: [1] -> A condição não foi cumprida, portanto, não está acontecendo racing condition [2] e [3] -> Segundo as condições, os dados estão sendo obtidos de maneira imprecisa pois está obtendo o "shared counter" após das threads.
+
+<img width="383" height="161" alt="image" src="https://github.com/user-attachments/assets/398b676a-f730-412a-8674-f78425f56649" />
+
+
+Teste depois de colocar o MUTEX e mover a posição dos "printk" para dentro do MUTEX
+
+Casos de Teste: [1] -> A condição não foi cumprida, portanto, não está acontecendo racing condition [2] e [3] -> Segundo as condições, os dados estão sendo obtidos de maneira correta.
+
+<img width="323" height="155" alt="image" src="https://github.com/user-attachments/assets/65ea11d1-e289-4bd4-8e3d-3f6989c4cfe6" />
