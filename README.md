@@ -361,10 +361,19 @@ void main(void)
     gpio_pin_set_dt(&led_green, 0);
     gpio_pin_set_dt(&led_blue, 1);
 
+    printk("Demo finished — blue LED steady\n");
+}
 
 PARTE DO TIAGO
 
-1. o código consertado pertence ao Bruno Mora
+1. o código do guilherme apresenta uma race condition entre as threads A e B devido a amb as utilizarem a variável global shared_pattern e a função apply_leds_pattern, gerando interrupções no código e comportamentos inesperados, como duas leds ligarem ao mesmo tempo.
 
-    printk("Demo finished — blue LED steady\n");
-}
+2. planejamento dos testes:
+
+   teste |                 pré condição                                |       etapas de teste              | pós condição
+     1   |threads A e B com mesma prioridade e desprotegidas           | verificar funcionamento do código  |   race condition
+     2   |threads A e B com prioridades diferentes e desprotegidas     |usar prioridades diferentes         |   race condition
+     3   |threads A e B com mesma prioridade e protegidas              | utilizar mutex                     |   código funcional
+
+   3. Correção do código: para corrigir o código foi utilizado mutex em ambas as threads assim que elas modificam a variável global ou acessam a função.
+  
