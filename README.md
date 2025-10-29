@@ -1,60 +1,318 @@
-# PSI-Microcontroladores2-Aula06
-Atividade: Resolução de Race Condition com Semáforo
+1. Revisão do código anterior: 
+O código do integrante Bruno Mora foi testado e percebi que o motivo de acontecer a race condition foi o k_yield entre as leituras e escritas das threads A e B, que verificam se outras threads estão prontas e passam o uso da cpu para frente. Por conta disso, as tarefas pausaram o que estavam fazendo no meio e permitiram que a outra thread iniciasse, ou seja, a variável global contador perdeu alguns aumentos, visto que A e B fazem a mesma leitura da variável global. Devido a isso ao final da execução, será possível ver que os logs indicarão que houve race condition.
+<img width="1027" height="269" alt="erro" src="https://github.com/user-attachments/assets/5e5837ba-67a4-403c-9c35-a2705770ab47" />
+2. Planejamento de testes:
+<img width="1440" height="123" alt="image2" src="https://github.com/user-attachments/assets/5bedaaa6-fe8f-48f3-8120-7c5ea51dfe7e" />
+3. Correção e reteste:
+Após a correção, que utilizou mutex para trancar a thread enquanto ela funcionava e destrancar após o término da contagem, o código funcionou perfeitamente sem nenhuma race condition. Isso se deve a capacidade dos mutex de bloquear o escalonador e não permitir que seções críticas sejam interrompidas, tornando o código estável.
+<img width="1138" height="245" alt="acerto" src="https://github.com/user-attachments/assets/ff6ae079-797e-428e-92b2-2a88914f5d55" />
+planejamento pós mudanças:
+<img width="1439" height="122" alt="image4" src="https://github.com/user-attachments/assets/16ef106b-e673-478f-846b-fca4c2132f16" />
 
-## 🎯 Objetivos da Atividade
-Nesta atividade, os alunos deverão:
-- Retomar o código gerado por IA em atividade anterior que apresenta **condições de corrida (race conditions)**.
-- Trabalhar em **duplas ou trios**, com **avaliação cruzada interna** entre os integrantes do grupo.
-- Aplicar **testes estruturados** com pré-condição, etapas de teste e pós-condição.
-- Demonstrar como o problema de concorrência foi **identificado e resolvido** com uso de semáforo.
+4. Avaliação Interna:
+A race condition observada no código original se devia ao compartilhamento da variável global, sem proteção, por duas threads. Esse erro pode ser facilmente evitado utilizando semáforos e o semáforo que utilizei foi um binário do tipo mutex. Ele foi responsável por proteger partes críticas do funcionamento do código e permitir que a race condition jamais aconteça, tornando o código estável e funcional.
+5.1 Código original(Guilherme):
 
-## 🧠 Etapas da Atividade
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/printk.h>
 
-### **1️⃣ Revisão do Código Anterior**
-- Cada integrante do grupo deverá **executar o código do colega** que contém a race condition original.
-- Documentar:
-  - O comportamento incorreto observado.
-  - O momento em que o erro ocorre (condição específica, sequência de eventos, etc.).
+#define STACK_SIZE 1024
+#define THREAD_PRIORITY 5
 
-### **2️⃣ Planejamento de Testes**
-Para cada cenário, descreva **três casos de teste** seguindo o formato abaixo:
+/* Device-tree LED specs using DT_ALIAS */
+static const struct gpio_dt_spec led_red = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
+static const struct gpio_dt_spec led_green = GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios);
+static const struct gpio_dt_spec led_blue = GPIO_DT_SPEC_GET(DT_ALIAS(led2), gpios);
 
-| Caso de Teste | Pré-condição | Etapas de Teste | Pós-condição Esperada |
-|----------------|---------------|------------------|------------------------|
-| 1 | ... | ... | ... |
-| 2 | ... | ... | ... |
-| 3 | ... | ... | ... |
+/* Shared global variable intentionally unprotected to create a race condition */
+static volatile uint8_t shared_pattern = 0;
 
-### **3️⃣ Correção e Reteste**
-- Corrigir o código para **eliminar a race condition**.
-- Reexecutar **os mesmos casos de teste** e registrar:
-  - As mudanças feitas.
-  - O resultado após a correção com evidências (capturas de tela por exemplo).
+/* Helper that applies LED outputs reading the shared variable repeatedly.
+ * Intentionally reads the shared variable separately for each LED with small delays
+ * between writes — this increases the chance of interleaving and visible color mixing.
+ */
+static void apply_leds_with_race(void)
+{
+    uint8_t val;
 
-### **4️⃣ Avaliação Interna (entre colegas do mesmo grupo)**
-Cada integrante deverá:
-1. Executar o código original do colega conforme os testes planejados.
-2. Executar o código corrigido do colega conforme os testes planejados.
-3. Conferir se as condições de corrida foram eliminadas.  
-4. Registrar uma **avaliação curta** (pode ser no final do README):
-   - O que estava errado antes.  
-   - O que mudou com a correção.
-   - Se o comportamento agora é estável.  
+    val = (shared_pattern & 0x01) ? 1U : 0U; /* red */
+    gpio_pin_set_dt(&led_red, val);
+    k_msleep(30);
 
-## 📦 Entregáveis
+    val = (shared_pattern & 0x02) ? 1U : 0U; /* green */
+    gpio_pin_set_dt(&led_green, val);
+   k_msleep(30);
+    val = (shared_pattern & 0x04) ? 1U : 0U; /* blue */
+    gpio_pin_set_dt(&led_blue, val);
+   k_msleep(30);
+}
 
-No repositório do grupo, incluir:
-1. `README.md` (este arquivo) contendo:
-   - Nome dos integrantes.
-   - Cenário escolhido.
-   - Casos de teste.
-   - Descrição da race condition e da solução.
-   - Avaliação de cada colega.
-2. Código-fonte organizado (considerando um código original e um corrigido por cada integrante):
-   - `codigo_original/`
-   - `codigo_corrigido/`
-3. Evidências (prints, logs, vídeos curtos, etc.) da execução dos testes.
+/* Thread A: toggles RED on/off repeatedly by writing shared_pattern = 0x01 or 0x00 */
+void thread_a(void *p1, void *p2, void *p3)
+{
+    ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
 
----
+    for (int i = 0; i < 40; i++) {
+        shared_pattern = 0x01; /* request RED */
+        k_busy_wait(2000);
+        apply_leds_with_race();
 
-**Repositório:** entregue via GitHub Classroom (um repositório por grupo) e um PDF do markdown final no Moodle.
+        k_msleep(80);
+
+        shared_pattern = 0x00; /* all off */
+        k_busy_wait(2000);
+        apply_leds_with_race();
+
+        k_msleep(120);
+    }
+
+    printk("Thread A finished\n");
+}
+
+/* Thread B: cycles between GREEN and BLUE by writing shared_pattern = 0x02 or 0x04 */
+void thread_b(void *p1, void *p2, void *p3)
+{
+    ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
+
+    for (int i = 0; i < 40; i++) {
+        shared_pattern = 0x02; /* request GREEN */
+        k_busy_wait(1500);
+        apply_leds_with_race();
+
+        k_msleep(100);
+
+        shared_pattern = 0x04; /* request BLUE */
+        k_busy_wait(1500);
+        apply_leds_with_race();
+
+        k_msleep(140);
+    }
+
+    printk("Thread B finished\n");
+}
+
+/* Thread stacks and thread control blocks */
+K_THREAD_STACK_DEFINE(stack_a, STACK_SIZE);
+K_THREAD_STACK_DEFINE(stack_b, STACK_SIZE);
+static struct k_thread thread_a_data;
+static struct k_thread thread_b_data;
+
+void main(void)
+{
+    int ret;
+
+    printk("Starting race-condition LED demo\n");
+
+    /* Configure LEDs from device-tree */
+    ret = gpio_pin_configure_dt(&led_red, GPIO_OUTPUT_LOW);
+    if (ret) {
+        printk("Failed to configure red LED\n");
+        return;
+    }
+    ret = gpio_pin_configure_dt(&led_green, GPIO_OUTPUT_LOW);
+    if (ret) {
+        printk("Failed to configure green LED\n");
+        return;
+    }
+    ret = gpio_pin_configure_dt(&led_blue, GPIO_OUTPUT_LOW);
+    if (ret) {
+        printk("Failed to configure blue LED\n");
+        return;
+    }
+
+    /* Create both threads (they start immediately) */
+    k_thread_create(&thread_a_data, stack_a, STACK_SIZE,
+                    thread_a, NULL, NULL, NULL,
+                    THREAD_PRIORITY, 0, K_NO_WAIT);
+
+    k_thread_create(&thread_b_data, stack_b, STACK_SIZE,
+                    thread_b, NULL, NULL, NULL,
+                    THREAD_PRIORITY, 0, K_NO_WAIT);
+
+    /* Wait for both threads to finish */
+    k_thread_join(&thread_a_data, K_FOREVER);
+    k_thread_join(&thread_b_data, K_FOREVER);
+
+    /* Indicate end by turning BLUE LED on steady */
+    shared_pattern = 0x00;
+    gpio_pin_set_dt(&led_red, 0);
+    gpio_pin_set_dt(&led_green, 0);
+    gpio_pin_set_dt(&led_blue, 1);
+
+    printk("Demo finished — blue LED steady\n");
+}
+
+
+Código corrigido(Guilherme):
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/printk.h>
+
+#define STACK_SIZE 1024
+#define THREAD_PRIORITY 5
+
+/* Device-tree LED specs using DT_ALIAS */
+static const struct gpio_dt_spec led_red = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
+static const struct gpio_dt_spec led_green = GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios);
+static const struct gpio_dt_spec led_blue = GPIO_DT_SPEC_GET(DT_ALIAS(led2), gpios);
+
+/* Shared global variable */
+static volatile uint8_t shared_pattern = 0;
+
+/* * 1. DEFINIÇÃO DO MUTEX
+ * Define e inicializa estaticamente o mutex que protegerá o shared_pattern.
+ */
+K_MUTEX_DEFINE(pattern_mutex);
+
+
+/* Helper que aplica LED outputs.
+ * Esta função NÃO é mais o problema, pois só será chamada
+ * de dentro de uma seção crítica protegida pelo mutex.
+ * (Voltamos a usar k_busy_wait, pois k_msleep dentro de um 
+ * mutex travado é uma má prática).
+ */
+static void apply_leds_pattern(void)
+{
+    uint8_t val;
+
+    /* A thread que está aqui é dona do 'pattern_mutex',
+     * então 'shared_pattern' não pode mudar. */
+
+    val = (shared_pattern & 0x01) ? 1U : 0U; /* red */
+    gpio_pin_set_dt(&led_red, val);
+    k_busy_wait(3000);
+
+    val = (shared_pattern & 0x02) ? 1U : 0U; /* green */
+    gpio_pin_set_dt(&led_green, val);
+    k_busy_wait(3000);
+
+    val = (shared_pattern & 0x04) ? 1U : 0U; /* blue */
+    gpio_pin_set_dt(&led_blue, val);
+    k_busy_wait(3000);
+}
+
+/* Thread A: toggles RED on/off repeatedly */
+void thread_a(void *p1, void *p2, void *p3)
+{
+    ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
+
+    for (int i = 0; i < 40; i++) {
+        
+        /* 2. INÍCIO DA SEÇÃO CRÍTICA */
+        k_mutex_lock(&pattern_mutex, K_FOREVER);
+        
+        shared_pattern = 0x01; /* request RED */
+        apply_leds_pattern();
+
+        /* 3. FIM DA SEÇÃO CRÍTICA */
+        k_mutex_unlock(&pattern_mutex);
+
+        k_msleep(80);
+
+        /* --- Outra Seção Crítica --- */
+        k_mutex_lock(&pattern_mutex, K_FOREVER);
+        
+        shared_pattern = 0x00; /* all off */
+        apply_leds_pattern();
+        
+        k_mutex_unlock(&pattern_mutex);
+        /* --- Fim da Seção Crítica --- */
+
+        k_msleep(120);
+    }
+
+    printk("Thread A finished\n");
+}
+
+/* Thread B: cycles between GREEN and BLUE */
+void thread_b(void *p1, void *p2, void *p3)
+{
+    ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
+
+    for (int i = 0; i < 40; i++) {
+        
+        /* 2. INÍCIO DA SEÇÃO CRÍTICA */
+        k_mutex_lock(&pattern_mutex, K_FOREVER);
+        
+        shared_pattern = 0x02; /* request GREEN */
+        apply_leds_pattern();
+        
+        /* 3. FIM DA SEÇÃO CRÍTICA */
+        k_mutex_unlock(&pattern_mutex);
+
+        k_msleep(100);
+
+        /* --- Outra Seção Crítica --- */
+        k_mutex_lock(&pattern_mutex, K_FOREVER);
+        
+        shared_pattern = 0x04; /* request BLUE */
+        apply_leds_pattern();
+        
+        k_mutex_unlock(&pattern_mutex);
+        /* --- Fim da Seção Crítica --- */
+
+        k_msleep(140);
+    }
+
+    printk("Thread B finished\n");
+}
+
+/* Thread stacks and thread control blocks */
+K_THREAD_STACK_DEFINE(stack_a, STACK_SIZE);
+K_THREAD_STACK_DEFINE(stack_b, STACK_SIZE);
+static struct k_thread thread_a_data;
+static struct k_thread thread_b_data;
+
+void main(void)
+{
+    int ret;
+
+    printk("Starting MUTEX-safe LED demo\n");
+
+    /* Configure LEDs from device-tree (igual a antes) */
+    ret = gpio_pin_configure_dt(&led_red, GPIO_OUTPUT_LOW);
+    if (ret) {
+        printk("Failed to configure red LED\n");
+        return;
+    }
+    ret = gpio_pin_configure_dt(&led_green, GPIO_OUTPUT_LOW);
+    if (ret) {
+        printk("Failed to configure green LED\n");
+        return;
+    }
+    ret = gpio_pin_configure_dt(&led_blue, GPIO_OUTPUT_LOW);
+    if (ret) {
+        printk("Failed to configure blue LED\n");
+        return;
+    }
+
+    /* * 4. INICIALIZAÇÃO
+     * Não é necessária uma chamada k_mutex_init() aqui, 
+     * pois K_MUTEX_DEFINE já faz a inicialização.
+     */
+
+    /* Create both threads (igual a antes) */
+    k_thread_create(&thread_a_data, stack_a, STACK_SIZE,
+                      thread_a, NULL, NULL, NULL,
+                      THREAD_PRIORITY, 0, K_NO_WAIT);
+
+    k_thread_create(&thread_b_data, stack_b, STACK_SIZE,
+                      thread_b, NULL, NULL, NULL,
+                      THREAD_PRIORITY, 0, K_NO_WAIT);
+
+    /* Wait for both threads to finish */
+    k_thread_join(&thread_a_data, K_FOREVER);
+    k_thread_join(&thread_b_data, K_FOREVER);
+
+    /* Indicate end (igual a antes) */
+    shared_pattern = 0x00;
+    gpio_pin_set_dt(&led_red, 0);
+    gpio_pin_set_dt(&led_green, 0);
+    gpio_pin_set_dt(&led_blue, 1);
+
+    printk("Demo finished — blue LED steady\n");
+}
