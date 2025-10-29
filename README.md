@@ -3,28 +3,28 @@ Integrantes:
 - Bruno Mora
 - Tiago Hayashi
 
-Parte do Bruno:
+# Parte do Bruno:
 
 Atividade: Resolução de Race Condition com Semáforo
 
    - Uso compartilhado de uma variável global
 
-# Planejamento de Testes
+## Planejamento de Testes
 | Caso de Teste | Pré-condição | Etapas de Teste | Pós-condição Esperada |
 |----------------|---------------|------------------|------------------------|
 | 1 | Existem duas threads com a mesma prioridade que incrementam em uma variável global. A thread deve receber a variável global "shared_counter"| Thread recebe a variável -> Incrementa na variável -> Apenas vai salvar na variável o valor incrementado pela última thread executada | A variável global imprimida deve ser igual em ambas as threads caso ocorra racing condition |
 | 2 | Existem duas threads com a mesma prioridade que incrementam em uma variável global. A thread deve receber a variável global "shared_counter"| Thread recebe a variável -> Incrementa na variável -> Apenas vai salvar na variável o valor incrementado pela última thread executada | Se a thread retornar o dobro do valor do print anterior, não está acontecendo racing condition, porém, os dados não estão sendo obtidos levando em consideração o incremento de cada thread |
 | 3 | Existem duas threads com a mesma prioridade que incrementam em uma variável global. A thread deve receber a variável global "shared_counter"| Thread recebe a variável -> Incrementa na variável -> Apenas vai salvar na variável o valor incrementado pela última thread executada | Se a thread retornar o valor anterior +1 em relação a outra thread, não acontece racing condition e obtém-se os dados corretos do incremento de cada thread |
 
-# O que estava errado antes?
+## O que estava errado antes?
   O Microcontrolador compartilha a função rand() com as duas threads e, por conta disso, o valor da seed pode ser alterado no caso de uma interrupção durante
   a chamada dessa função. Isso faz com que a integridade do gerador de funções não seja garantida e faça com que a execução do código não seja previsível.
-# O que mudou com a correção?
+## O que mudou com a correção?
   Foi aplicado um MUTEX quando a função rand() é chamada, assim, o mesmo não pode ser interrompido quando está em execução. Dessa forma, o valor utilizado pela função é preservado na thread e não afeta a integridade do gerador de funções.
-# O comportamento agora está estável?
+## O comportamento agora está estável?
   Agora, a função não é interrompida no meio e o comportamento do LED no microcontrolador está estável, já que a variável salva não muda ao retornar para a thread após a interrupção.
 
-# Evidências
+## Evidências
 
 Teste antes de colocar o MUTEX
 
@@ -41,19 +41,23 @@ Casos de Teste: [1] -> A condição não foi cumprida, portanto, não está acon
 
 Teste depois de colocar o MUTEX e mover a posição dos "printk" para dentro do MUTEX
 
-Parte do Guilherme:
-1. Revisão do código anterior: 
+# Parte do Guilherme:
+
+## Revisão do código anterior: 
 O código do integrante Bruno Mora foi testado e percebi que o motivo de acontecer a race condition foi o k_yield entre as leituras e escritas das threads A e B, que verificam se outras threads estão prontas e passam o uso da cpu para frente. Por conta disso, as tarefas pausaram o que estavam fazendo no meio e permitiram que a outra thread iniciasse, ou seja, a variável global contador perdeu alguns aumentos, visto que A e B fazem a mesma leitura da variável global. Devido a isso ao final da execução, será possível ver que os logs indicarão que houve race condition.
 <img width="1027" height="269" alt="erro" src="https://github.com/user-attachments/assets/5e5837ba-67a4-403c-9c35-a2705770ab47" />
-2. Planejamento de testes:
+
+## Planejamento de testes:
 <img width="1440" height="123" alt="image2" src="https://github.com/user-attachments/assets/5bedaaa6-fe8f-48f3-8120-7c5ea51dfe7e" />
-3. Correção e reteste:
+
+## Correção e reteste:
 Após a correção, que utilizou mutex para trancar a thread enquanto ela funcionava e destrancar após o término da contagem, o código funcionou perfeitamente sem nenhuma race condition. Isso se deve a capacidade dos mutex de bloquear o escalonador e não permitir que seções críticas sejam interrompidas, tornando o código estável.
 <img width="1138" height="245" alt="acerto" src="https://github.com/user-attachments/assets/ff6ae079-797e-428e-92b2-2a88914f5d55" />
-planejamento pós mudanças:
+
+Planejamento pós mudanças:
 <img width="1439" height="122" alt="image4" src="https://github.com/user-attachments/assets/16ef106b-e673-478f-846b-fca4c2132f16" />
 
-4. Avaliação Interna:
+## Avaliação Interna:
 A race condition observada no código original se devia ao compartilhamento da variável global, sem proteção, por duas threads. Esse erro pode ser facilmente evitado utilizando semáforos e o semáforo que utilizei foi um binário do tipo mutex. Ele foi responsável por proteger partes críticas do funcionamento do código e permitir que a race condition jamais aconteça, tornando o código estável e funcional.
 5.1 Código original(Guilherme):
 
