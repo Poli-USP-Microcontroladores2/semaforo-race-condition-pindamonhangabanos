@@ -1,7 +1,7 @@
 # PSI-Microcontroladores2-Aula06
 Atividade: Resolução de Race Condition com Semáforo
 
-   - Bruno Mora, GUilherme Fernandes, Tiago Hayashi
+   - Bruno Mora, Guilherme Fernandes, Tiago Hayashi
    - Uso compartilhado de uma variável global
 
 # Planejamento de Testes
