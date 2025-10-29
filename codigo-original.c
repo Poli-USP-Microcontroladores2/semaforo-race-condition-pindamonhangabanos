@@ -1,55 +1,65 @@
-#include <zephyr.h>
-#include <device.h>
-#include <drivers/gpio.h>
-#include <sys/printk.h>
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/printk.h>
+
+/* Ajuste de acordo com os pinos do FRDM-KL25Z */
+#define RED_LED_NODE   DT_ALIAS(led0)
+#define GREEN_LED_NODE DT_ALIAS(led1)
+
+static const struct gpio_dt_spec red_led = GPIO_DT_SPEC_GET(RED_LED_NODE, gpios);
+static const struct gpio_dt_spec green_led = GPIO_DT_SPEC_GET(GREEN_LED_NODE, gpios);
 
 #define STACK_SIZE 512
 #define PRIORITY 5
-
-/* Nome do dispositivo de LED (verifique no device tree da KL25Z) */
-#define LED_PORT DT_LABEL(DT_NODELABEL(gpioe))
-#define RED_PIN 29   /* PTE29 - LED vermelho */
-#define GREEN_PIN 31 /* PTE31 - LED verde */
-
-static const struct device *gpio_dev;
-
-/* Variável compartilhada entre as threads */
-volatile int shared_counter = 0;
-
-/* Delay entre alterações */
 #define DELAY_MS 100
 
-/* Thread 1 - incrementa o contador e acende LED vermelho */
+/* Variável global compartilhada */
+volatile int shared_counter = 0;
+
+/* Mutex para proteger (habilite para corrigir race condition) */
+K_MUTEX_DEFINE(counter_mutex);
+
+/* Se quiser demonstrar o erro, comente as duas linhas de lock/unlock! */
+
+/* Thread A */
 void thread_a(void)
 {
     while (1) {
+        /* 🔴 Race condition demonstrativa */
+        // k_mutex_lock(&counter_mutex, K_FOREVER);
+
         int local = shared_counter;
         local++;
-        /* Simula tempo de processamento antes de escrever de volta */
-        k_msleep(10);
+        k_msleep(10); // simula atraso
         shared_counter = local;
 
-        gpio_pin_set(gpio_dev, RED_PIN, 1);
+        // k_mutex_unlock(&counter_mutex);
+
+        gpio_pin_set_dt(&red_led, 1);
         k_msleep(DELAY_MS);
-        gpio_pin_set(gpio_dev, RED_PIN, 0);
+        gpio_pin_set_dt(&red_led, 0);
 
         printk("Thread A: shared_counter = %d\n", shared_counter);
     }
 }
 
-/* Thread 2 - também incrementa o contador e acende LED verde */
+/* Thread B */
 void thread_b(void)
 {
     while (1) {
+        // k_mutex_lock(&counter_mutex, K_FOREVER);
+
         int local = shared_counter;
         local++;
-        /* Simula tempo de processamento antes de escrever de volta */
         k_msleep(10);
         shared_counter = local;
 
-        gpio_pin_set(gpio_dev, GREEN_PIN, 1);
+        // k_mutex_unlock(&counter_mutex);
+
+        gpio_pin_set_dt(&green_led, 1);
         k_msleep(DELAY_MS);
-        gpio_pin_set(gpio_dev, GREEN_PIN, 0);
+        gpio_pin_set_dt(&green_led, 0);
 
         printk("Thread B: shared_counter = %d\n", shared_counter);
     }
@@ -61,17 +71,15 @@ K_THREAD_DEFINE(thread_b_id, STACK_SIZE, thread_b, NULL, NULL, NULL, PRIORITY, 0
 
 void main(void)
 {
-    printk("Iniciando exemplo de Race Condition no KL25Z com Zephyr!\n");
+    printk("=== Exemplo de Race Condition no FRDM-KL25Z (Zephyr 3.4.x) ===\n");
 
-    gpio_dev = device_get_binding(LED_PORT);
-    if (!gpio_dev) {
-        printk("Erro ao acessar GPIOs do LED!\n");
+    if (!device_is_ready(red_led.port) || !device_is_ready(green_led.port)) {
+        printk("Erro: LEDs não estão prontos\n");
         return;
     }
 
-    gpio_pin_configure(gpio_dev, RED_PIN, GPIO_OUTPUT_INACTIVE);
-    gpio_pin_configure(gpio_dev, GREEN_PIN, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure_dt(&red_led, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure_dt(&green_led, GPIO_OUTPUT_INACTIVE);
 
     printk("Threads iniciadas...\n");
 }
-
