@@ -1,67 +1,77 @@
-#include <zephyr/kernel.h>
-#include <zephyr/drivers/gpio.h>
-#include <zephyr/logging/log.h>
-#include <stdlib.h>    // Para rand() e srand()
-#include <zephyr/sys/printk.h>
+#include <zephyr.h>
+#include <device.h>
+#include <drivers/gpio.h>
+#include <sys/printk.h>
 
-LOG_MODULE_REGISTER(race_example, LOG_LEVEL_INF);
+#define STACK_SIZE 512
+#define PRIORITY 5
 
-// LEDs: KL25Z - led0 = vermelho, led2 = azul
-#define LED_RED_NODE   DT_ALIAS(led0)
-#define LED_BLUE_NODE  DT_ALIAS(led2)
+/* Nome do dispositivo de LED (verifique no device tree da KL25Z) */
+#define LED_PORT DT_LABEL(DT_NODELABEL(gpioe))
+#define RED_PIN 29   /* PTE29 - LED vermelho */
+#define GREEN_PIN 31 /* PTE31 - LED verde */
 
-static const struct gpio_dt_spec led_red = GPIO_DT_SPEC_GET(LED_RED_NODE, gpios);
-static const struct gpio_dt_spec led_blue = GPIO_DT_SPEC_GET(LED_BLUE_NODE, gpios);
+static const struct device *gpio_dev;
 
-// Função que alterna aleatoriamente um LED
-void toggle_led_aleatorio(void)
-{
+/* Variável compartilhada entre as threads */
+volatile int shared_counter = 0;
 
-    int escolha = rand() % 2;
+/* Delay entre alterações */
+#define DELAY_MS 100
 
-    if (escolha == 0) {
-        gpio_pin_toggle_dt(&led_red);
-        LOG_INF("Toggle no LED VERMELHO (thread: %p)", k_current_get());
-    } else {
-        gpio_pin_toggle_dt(&led_blue);
-        LOG_INF("Toggle no LED AZUL (thread: %p)", k_current_get());
-    }
-}
-
-// Thread A
-void thread_a(void *p1, void *p2, void *p3)
+/* Thread 1 - incrementa o contador e acende LED vermelho */
+void thread_a(void)
 {
     while (1) {
-        toggle_led_aleatorio();
-        k_msleep(150);
+        int local = shared_counter;
+        local++;
+        /* Simula tempo de processamento antes de escrever de volta */
+        k_msleep(10);
+        shared_counter = local;
+
+        gpio_pin_set(gpio_dev, RED_PIN, 1);
+        k_msleep(DELAY_MS);
+        gpio_pin_set(gpio_dev, RED_PIN, 0);
+
+        printk("Thread A: shared_counter = %d\n", shared_counter);
     }
 }
 
-// Thread B
-void thread_b(void *p1, void *p2, void *p3)
+/* Thread 2 - também incrementa o contador e acende LED verde */
+void thread_b(void)
 {
     while (1) {
-        toggle_led_aleatorio();
-        k_msleep(120);
+        int local = shared_counter;
+        local++;
+        /* Simula tempo de processamento antes de escrever de volta */
+        k_msleep(10);
+        shared_counter = local;
+
+        gpio_pin_set(gpio_dev, GREEN_PIN, 1);
+        k_msleep(DELAY_MS);
+        gpio_pin_set(gpio_dev, GREEN_PIN, 0);
+
+        printk("Thread B: shared_counter = %d\n", shared_counter);
     }
 }
 
-// Define as threads
-K_THREAD_DEFINE(thread_a_id, 512, thread_a, NULL, NULL, NULL, 5, 0, 0);
-K_THREAD_DEFINE(thread_b_id, 512, thread_b, NULL, NULL, NULL, 5, 0, 0);
+/* Criação das threads */
+K_THREAD_DEFINE(thread_a_id, STACK_SIZE, thread_a, NULL, NULL, NULL, PRIORITY, 0, 0);
+K_THREAD_DEFINE(thread_b_id, STACK_SIZE, thread_b, NULL, NULL, NULL, PRIORITY, 0, 0);
 
 void main(void)
 {
-    // Inicializa gerador rand com base no uptime (sem seed, pode repetir no reboot)
-    srand((unsigned int)k_uptime_get());
+    printk("Iniciando exemplo de Race Condition no KL25Z com Zephyr!\n");
 
-    if (!device_is_ready(led_red.port) || !device_is_ready(led_blue.port)) {
-        LOG_ERR("GPIOs dos LEDs não estão prontos");
+    gpio_dev = device_get_binding(LED_PORT);
+    if (!gpio_dev) {
+        printk("Erro ao acessar GPIOs do LED!\n");
         return;
     }
 
-    gpio_pin_configure_dt(&led_red, GPIO_OUTPUT_INACTIVE);
-    gpio_pin_configure_dt(&led_blue, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure(gpio_dev, RED_PIN, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure(gpio_dev, GREEN_PIN, GPIO_OUTPUT_INACTIVE);
 
-    LOG_INF("Iniciando teste de Race Condition com LEDs");
+    printk("Threads iniciadas...\n");
 }
+
